@@ -19,7 +19,10 @@ defmodule Blockchain.Ethash do
   @j_cacherounds 3
   @j_parents 256
   @j_wordbytes 4
+  @j_accesses 64
   @hash_words div(@j_hashbytes, @j_wordbytes)
+  @mix_words div(@j_mixbytes, @j_wordbytes)
+  @mix_hash div(@j_mixbytes, @j_hashbytes)
   @parents_range Range.new(0, @j_parents - 1)
 
   @precomputed_data_sizes [__DIR__, "ethash", "data_sizes.txt"]
@@ -92,6 +95,35 @@ defmodule Blockchain.Ethash do
     one_less..2
     |> Enum.find(fn a -> rem(num, a) == 0 end)
     |> is_nil
+  end
+
+  def pow_full(dataset, block_hash, nonce) do
+    full_size = length(dataset)
+    seed_hash = combine_header_and_nonce(block_hash, nonce)
+
+    mix =
+      seed_hash
+      |> init_mix_with_replication()
+
+    mix
+  end
+
+  defp init_mix_with_replication(seed_hash) do
+    seed_hash
+    |> List.duplicate(@mix_hash)
+    |> List.flatten()
+    |> Enum.map(&binary_into_uint32_list/1)
+    |> List.flatten()
+  end
+
+  defp combine_header_and_nonce(block_hash, nonce) do
+    Keccak.kec512(block_hash <> nonce_into_64bit(nonce))
+  end
+
+  defp nonce_into_64bit(nonce) do
+    nonce
+    |> :binary.encode_unsigned(:little)
+    |> BitHelper.pad(8, :little)
   end
 
   @doc """

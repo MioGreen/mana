@@ -72,6 +72,36 @@ defmodule Blockchain.EthashTest do
     end
   end
 
+  describe "pow_full/3" do
+    test "calculates proof-of-work with full dataset" do
+      cache_size = 1024
+      dataset_size = 32 * 1024
+      block = 1
+
+      dataset =
+        block
+        |> Ethash.seed_hash()
+        |> Ethash.generate_cache(cache_size)
+        |> Ethash.generate_dataset(dataset_size)
+
+      block_hash =
+        load_raw_hex("0xc9149cc0386e689d789a1c2f3d5d169a61a6218ed30e74414dc736e442ef3d1f")
+
+      nonce = 0
+
+      {digest, result} = Ethash.pow_full(dataset, block_hash, nonce)
+
+      expected_digest =
+        load_raw_hex("0xe4073cffaef931d37117cefd9afd27ea0f1cad6a981dd2605c4a1ac97c519800")
+
+      expected_result =
+        load_raw_hex("0xd3539235ee2e6f8db665c0a72169f55b7f6c605712330b778ec3944f0eb5a557")
+
+      assert digest == expected_digest
+      assert result == expected_result
+    end
+  end
+
   describe "pow_light/4" do
     test "calculates proof-of-work with light dataset" do
       cache_size = 1024
@@ -89,36 +119,6 @@ defmodule Blockchain.EthashTest do
       nonce = 0
 
       {digest, result} = Ethash.pow_light(full_size, cache, block_hash, nonce)
-
-      expected_digest =
-        load_raw_hex("0xe4073cffaef931d37117cefd9afd27ea0f1cad6a981dd2605c4a1ac97c519800")
-
-      expected_result =
-        load_raw_hex("0xd3539235ee2e6f8db665c0a72169f55b7f6c605712330b778ec3944f0eb5a557")
-
-      assert digest == expected_digest
-      assert result == expected_result
-    end
-  end
-
-  describe "pow_full/4" do
-    test "calculates proof-of-work with light dataset" do
-      cache_size = 1024
-      dataset_size = 32 * 1024
-      block = 1
-
-      dataset =
-        block
-        |> Ethash.seed_hash()
-        |> Ethash.generate_cache(cache_size)
-        |> Ethash.generate_dataset(dataset_size)
-
-      block_hash =
-        load_raw_hex("0xc9149cc0386e689d789a1c2f3d5d169a61a6218ed30e74414dc736e442ef3d1f")
-
-      nonce = 0
-
-      {digest, result} = Ethash.pow_full(dataset, block_hash, nonce)
 
       expected_digest =
         load_raw_hex("0xe4073cffaef931d37117cefd9afd27ea0f1cad6a981dd2605c4a1ac97c519800")
