@@ -380,7 +380,7 @@ defmodule ExWire.Struct.BlockQueue do
 
   # Tries to get the transaction root by encoding the transaction trie
   @spec get_transactions_root([ExRLP.t()]) :: MerklePatriciaTree.Trie.root_hash()
-  defp get_transactions_root(transactions_rlp) do
+  def get_transactions_root(transactions_rlp) do
     # this is a throw-away
     db = MerklePatriciaTree.Test.random_ets_db()
 
@@ -393,7 +393,7 @@ defmodule ExWire.Struct.BlockQueue do
   end
 
   @spec get_ommers_hash(list(binary())) :: ExthCrypto.Hash.hash()
-  defp get_ommers_hash(ommers_rlp) do
+  def get_ommers_hash(ommers_rlp) do
     ommers_rlp
     |> ExRLP.encode()
     |> ExthCrypto.Hash.Keccak.kec()

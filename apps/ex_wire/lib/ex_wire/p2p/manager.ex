@@ -107,7 +107,6 @@ defmodule ExWire.P2P.Manager do
             queued_data: <<>>
         }
 
-        # TODO: What do we do about unknown packets?
         conn_after_handle =
           case get_packet(packet_type, packet_data) do
             {:ok, packet_mod, packet} ->
@@ -262,9 +261,9 @@ defmodule ExWire.P2P.Manager do
 
     :ok =
       Logger.debug(fn ->
-        "[Network] [#{peer}] Sending packet #{inspect(packet_mod)} to #{peer.host_name} (##{
-          conn.sent_message_count + 1
-        })"
+        "[Network] [#{peer}] Sending packet #{inspect(packet_mod)} (#{
+          inspect(packet_type, base: :hex)
+        }) to #{peer.host_name} (##{conn.sent_message_count + 1})"
       end)
 
     packet_data = apply(packet_mod, :serialize, [packet])

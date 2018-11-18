@@ -52,7 +52,7 @@ defmodule ExWire.Packet.GetBlockBodies do
   end
 
   @doc """
-  Handles a GetBlockBodies message. We shoud send the block bodies
+  Handles a GetBlockBodies message. We should send the block bodies
   to the peer if we have them. For now, we'll do nothing.
 
   ## Examples

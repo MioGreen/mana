@@ -65,7 +65,7 @@ defmodule Blockchain.Blocktree do
   end
 
   @spec update_best_block(t, Block.t()) :: t
-  defp update_best_block(blocktree, block) do
+  def update_best_block(blocktree, block) do
     best_block = blocktree.best_block
 
     new_best_block =

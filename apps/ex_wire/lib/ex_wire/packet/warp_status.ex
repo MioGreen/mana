@@ -1,30 +1,16 @@
-defmodule ExWire.Packet.Status do
+defmodule ExWire.Packet.WarpStatus do
   @moduledoc """
-  Status messages establish a proper Eth Wire connection, and verify the two
-  clients are compatable.
+  Status messages updated to handle warp details.
 
   ```
   **Status** [`+0x00`: `P`, `protocolVersion`: `P`, `networkId`: `P`,
-              `td`: `P`, `bestHash`: `B_32`, `genesisHash`: `B_32`]
+              `td`: `P`, `bestHash`: `B_32`, `genesisHash`: `B_32`,
+              `snapshot_hash`: B_32, `snapshot_number`: P]
 
-  Inform a peer of its current ethereum state. This message should be sent
-  after the initial handshake and prior to any ethereum related messages.
-
-  * `protocolVersion` is one of:
-    * `0x00` for PoC-1;
-    * `0x01` for PoC-2;
-    * `0x07` for PoC-3;
-    * `0x09` for PoC-4.
-    * `0x17` for PoC-5.
-    * `0x1c` for PoC-6.
-    * `61` for PV61
-    * `62` for PV62
-    * `63` for PV63
-  * `networkId`: 0=Olympic (disused), 1=Frontier (mainnet), 2=Morden (disused),
-                 3=Ropsten (testnet), 4=Rinkeby
-  * `td`: Total Difficulty of the best chain. Integer, as found in block header.
-  * `bestHash`: The hash of the best (i.e. highest TD) known block.
-  * `genesisHash`: The hash of the Genesis block.
+  In addition to all the fields in eth protocol version 63’s status (denoted
+  by `...`), include `snapshot_hash` and `snapshot_number` which signify the
+  snapshot manifest RLP hash and block number respectively of the peer's local
+  snapshot.
   ```
   """
 
@@ -37,7 +23,9 @@ defmodule ExWire.Packet.Status do
           network_id: integer(),
           total_difficulty: integer(),
           best_hash: binary(),
-          genesis_hash: binary()
+          genesis_hash: binary(),
+          snapshot_hash: EVM.hash(),
+          snapshot_number: integer()
         }
 
   defstruct [
@@ -45,11 +33,13 @@ defmodule ExWire.Packet.Status do
     :network_id,
     :total_difficulty,
     :best_hash,
-    :genesis_hash
+    :genesis_hash,
+    :snapshot_hash,
+    :snapshot_number
   ]
 
   @doc """
-  Create a Status packet to return
+  Build a WarpStatus packet
 
   Note: we are currently reflecting values based on the packet received, but
   that should not be the case. We should provide the total difficulty of the
@@ -58,40 +48,46 @@ defmodule ExWire.Packet.Status do
 
   TODO: Don't parrot the same data back to sender
   """
-  @spec new(t) :: t()
+  @spec new(t()) :: t()
   def new(packet) do
     %__MODULE__{
-      protocol_version: ExWire.Config.protocol_version(),
+      protocol_version: 1,
       network_id: ExWire.Config.network_id(),
       total_difficulty: packet.total_difficulty,
       best_hash: packet.genesis_hash,
-      genesis_hash: packet.genesis_hash
+      genesis_hash: packet.genesis_hash,
+      snapshot_hash: <<0::256>>,
+      snapshot_number: 0
     }
   end
 
   @doc """
-  Given a Status packet, serializes for transport over Eth Wire Protocol.
+  Given a WarpStatus packet, serializes for transport over Eth Wire Protocol.
 
   ## Examples
 
-      iex> %ExWire.Packet.Status{
+      iex> %ExWire.Packet.WarpStatus{
       ...>   protocol_version: 0x63,
       ...>   network_id: 3,
       ...>   total_difficulty: 10,
       ...>   best_hash: <<5>>,
-      ...>   genesis_hash: <<4>>
+      ...>   genesis_hash: <<6::256>>,
+      ...>   snapshot_hash: <<7::256>>,
+      ...>   snapshot_number: 8,
       ...> }
-      ...> |> ExWire.Packet.Status.serialize
-      [0x63, 3, 10, <<5>>, <<4>>]
+      ...> |> ExWire.Packet.WarpStatus.serialize
+      [0x63, 3, 10, <<5>>, <<6::256>>, <<7::256>>, 8]
   """
-  @spec serialize(t) :: ExRLP.t()
+  @spec serialize(t()) :: ExRLP.t()
   def serialize(packet = %__MODULE__{}) do
     [
       packet.protocol_version,
       packet.network_id,
       packet.total_difficulty,
       packet.best_hash,
-      packet.genesis_hash
+      packet.genesis_hash,
+      packet.snapshot_hash,
+      packet.snapshot_number
     ]
   end
 
@@ -101,23 +97,27 @@ defmodule ExWire.Packet.Status do
 
   ## Examples
 
-      iex> ExWire.Packet.Status.deserialize([<<0x63>>, <<3>>, <<10>>, <<5>>, <<4>>])
-      %ExWire.Packet.Status{
+      iex> ExWire.Packet.WarpStatus.deserialize([<<0x63>>, <<3>>, <<10>>, <<5>>, <<6::256>>, <<7::256>>, 8])
+      %ExWire.Packet.WarpStatus{
         protocol_version: 0x63,
         network_id: 3,
         total_difficulty: 10,
         best_hash: <<5>>,
-        genesis_hash: <<4>>
+        genesis_hash: <<6::256>>,
+        snapshot_hash: <<7::256>>,
+        snapshot_number: 8,
       }
   """
-  @spec deserialize(ExRLP.t()) :: t
+  @spec deserialize(ExRLP.t()) :: t()
   def deserialize(rlp) do
     [
       protocol_version,
       network_id,
       total_difficulty,
       best_hash,
-      genesis_hash
+      genesis_hash,
+      snapshot_hash,
+      snapshot_number
     ] = rlp
 
     %__MODULE__{
@@ -125,63 +125,56 @@ defmodule ExWire.Packet.Status do
       network_id: :binary.decode_unsigned(network_id),
       total_difficulty: :binary.decode_unsigned(total_difficulty),
       best_hash: best_hash,
-      genesis_hash: genesis_hash
+      genesis_hash: genesis_hash,
+      snapshot_hash: snapshot_hash,
+      snapshot_number: snapshot_number
     }
   end
 
   @doc """
-  Handles a Status message.
+  Handles a WarpStatus message.
 
   We should decide whether or not we want to continue communicating with
   this peer. E.g. do our network and protocol versions match?
 
   ## Examples
 
-      iex> %ExWire.Packet.Status{
+      iex> %ExWire.Packet.WarpStatus{
       ...>   protocol_version: 63,
       ...>   network_id: 3,
       ...>   total_difficulty: 10,
-      ...>   best_hash: <<5>>,
-      ...>   genesis_hash: <<4>>
+      ...>   best_hash: <<4::256>>,
+      ...>   genesis_hash: <<4::256>>
       ...> }
-      ...> |> ExWire.Packet.Status.handle()
+      ...> |> ExWire.Packet.WarpStatus.handle()
       {:send,
-             %ExWire.Packet.Status{
-               best_hash: <<4>>,
-               genesis_hash: <<4>>,
+             %ExWire.Packet.WarpStatus{
+               best_hash: <<4::256>>,
+               genesis_hash: <<4::256>>,
                network_id: 3,
                protocol_version: 63,
-               total_difficulty: 10
+               total_difficulty: 10,
+               snapshot_hash: nil,
+               snapshot_number: nil
              }}
 
       # Test a peer with an incompatible version
-      iex> %ExWire.Packet.Status{
+      iex> %ExWire.Packet.WarpStatus{
       ...>   protocol_version: 555,
       ...>   network_id: 3,
       ...>   total_difficulty: 10,
       ...>   best_hash: <<5>>,
-      ...>   genesis_hash: <<4>>
+      ...>   genesis_hash: <<4>>,
+      ...>   snapshot_hash: <<7::256>>,
+      ...>   snapshot_number: 8
       ...> }
-      ...> |> ExWire.Packet.Status.handle()
+      ...> |> ExWire.Packet.WarpStatus.handle()
       {:disconnect, :useless_peer}
   """
   @spec handle(ExWire.Packet.packet()) :: ExWire.Packet.handle_response()
   def handle(packet = %__MODULE__{}) do
-    Exth.trace(fn -> "[Packet] Got Status: #{inspect(packet)}" end)
+    Exth.trace(fn -> "[Packet] Got WarpStatus: #{inspect(packet)}" end)
 
-    if packet.protocol_version == ExWire.Config.protocol_version() do
-      {:send, new(packet)}
-    else
-      # TODO: We need to follow up on disconnection packets with disconnection
-      #       ourselves
-      _ =
-        Logger.debug(fn ->
-          "[Packet] Disconnecting to due incompatible protocol version (them #{
-            packet.protocol_version
-          }, us: #{ExWire.Config.protocol_version()})"
-        end)
-
-      {:disconnect, :useless_peer}
-    end
+    {:send, new(packet)}
   end
 end

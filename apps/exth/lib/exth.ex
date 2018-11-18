@@ -20,4 +20,16 @@ defmodule Exth do
 
     :ok
   end
+
+  @spec maybe_decode_unsigned(integer() | binary()) :: integer()
+  def maybe_decode_unsigned(val) when is_integer(val), do: val
+
+  def maybe_decode_unsigned(val) when is_binary(val) do
+    :binary.decode_unsigned(val)
+  end
+
+  @spec encode_hex(binary()) :: String.t()
+  def encode_hex(bin) do
+    "0x#{Base.encode16(bin, case: :lower)}"
+  end
 end

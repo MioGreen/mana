@@ -29,7 +29,7 @@ config :ex_wire,
   protocol_version: 63,
   # ropsten
   network_id: 3,
-  caps: [{"eth", 62}, {"eth", 63}],
+  caps: [{"eth", 62}, {"eth", 63}, {"par", 1}],
   chain: :ropsten,
   # TODO: This should be set and stored in a file
   private_key: :random,

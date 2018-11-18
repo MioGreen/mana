@@ -19,6 +19,13 @@ defmodule ExWire.Packet do
           :ok | :activate | :peer_disconnect | {:disconnect, atom()} | {:send, struct()}
   @callback handle(packet) :: handle_response
 
+  # TODO: The packet numbers here are... wrong. It's not explained in the docs
+  #       but here's the algorithm from other implementations:
+  # Let index=0, offset=0x10
+  # for (cap, index) in sorted(caps):
+  #   let cap.offset = offset
+  #   offset += cap.packet_count
+
   @packet_types %{
     0x00 => Packet.Hello,
     0x01 => Packet.Disconnect,
@@ -27,22 +34,25 @@ defmodule ExWire.Packet do
     ### Ethereum Sub-protocol
     0x10 => Packet.Status,
     # New model syncing (PV62)
-    0x11 => Packet.NewBlockHashes,
-    0x12 => Packet.Transactions,
-    # New model syncing (PV62)
-    0x13 => Packet.GetBlockHeaders,
-    # New model syncing (PV62)
-    0x14 => Packet.BlockHeaders,
-    # New model syncing (PV62)
-    0x15 => Packet.GetBlockBodies,
-    # New model syncing (PV62)
-    0x16 => Packet.BlockBodies
+    0x22 => Packet.NewBlockHashes,
+    0x23 => Packet.Transactions,
+    0x24 => Packet.GetBlockHeaders,
+    0x25 => Packet.BlockHeaders,
+    0x26 => Packet.GetBlockBodies,
+    0x27 => Packet.BlockBodies,
     # 0x17 => Packet.NewBlock,
     ### Fast synchronization (PV63)
     # 0x1d => Packet.GetNodeData,
     # 0x1e => Packet.NodeData,
     # 0x1f => Packet.GetReceipts,
-    # 0x20 => Packet.Receipts
+    # 0x20 => Packet.Receipts,
+    ### Warp Sync (par)
+    # TODO: Fix the hack out of this
+    0x21 => Packet.WarpStatus,
+    0x32 => Packet.GetSnapshotManifest,
+    0x33 => Packet.SnapshotManifest,
+    0x34 => Packet.GetSnapshotData,
+    0x35 => Packet.SnapshotData
   }
 
   @packet_types_inverted for({k, v} <- @packet_types, do: {v, k}) |> Enum.into(%{})
