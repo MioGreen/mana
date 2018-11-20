@@ -21,8 +21,10 @@ defmodule Blockchain.Ethash do
   @j_wordbytes 4
   @j_accesses 64
   @hash_words div(@j_hashbytes, @j_wordbytes)
-  @mix_words div(@j_mixbytes, @j_wordbytes)
+  # @mix_words div(@j_mixbytes, @j_wordbytes)
+  # Equation 323
   @mix_hash div(@j_mixbytes, @j_hashbytes)
+  @mix_length div(@j_mixbytes, @j_wordbytes)
   @parents_range Range.new(0, @j_parents - 1)
 
   @precomputed_data_sizes [__DIR__, "ethash", "data_sizes.txt"]
@@ -98,14 +100,78 @@ defmodule Blockchain.Ethash do
   end
 
   def pow_full(dataset, block_hash, nonce) do
-    full_size = length(dataset)
+    # dataset
+    # |> Enum.map(&binary_into_uint32_list/1)
+    # |> List.flatten()
+    # |> IO.inspect(label: "dataset uint32")
+    #
+    # dataset
+    # |> IO.inspect(label: "dataset")
+    #
+    # full_size = length(dataset)
+    # this is the seed on line algorithm.go:344
     seed_hash = combine_header_and_nonce(block_hash, nonce)
+
+    seed_head =
+      seed_hash
+      |> binary_into_uint32_list()
+      |> Enum.at(0)
 
     mix =
       seed_hash
       |> init_mix_with_replication()
+      |> IO.inspect(label: "mix with replication")
+      |> mix_random_dataset_nodes(dataset, seed_head)
+      |> IO.inspect(label: "mix after random")
 
     mix
+  end
+
+  defp mix_random_dataset_nodes(mix, dataset, seed_head) do
+    dataset_length =
+      length(dataset)
+      |> div(@mix_hash)
+      |> IO.inspect(label: "rows")
+
+    Enum.reduce(0..(@j_accesses - 1), [], fn j, _temp ->
+      parent =
+        bxor(j, seed_head)
+        |> FNV.hash(
+          mix
+          |> Enum.at(Integer.mod(j, @mix_length))
+          |> Enum.at(0)
+        )
+        |> Integer.mod(dataset_length)
+
+      IO.inspect(parent, label: "dufuq?")
+
+      # something = Integer.mod(parent, div(div(length(dataset), @j_hashbytes), @mix_hash))
+      # mix_hash times do |j|
+      temp =
+        Enum.reduce(0..(@mix_hash - 1), [], fn k, temp ->
+          IO.inspect(k, label: "j")
+
+          IO.inspect(parent, label: "what!")
+
+          what =
+            (2 * parent + k)
+            |> IO.inspect(label: "2*parent+j")
+
+          element = Enum.at(dataset, what) |> IO.inspect(label: "element")
+          element |> binary_into_uint32_list() |> IO.inspect(label: "element list")
+          [element | temp]
+        end)
+        |> Enum.reverse()
+        |> IO.inspect(label: "temp")
+        |> Enum.map(&binary_into_uint32_list/1)
+        |> IO.inspect(label: "temp uint32")
+
+      result =
+        FNV.hash_lists(mix |> List.flatten() |> IO.inspect(label: "mix"), temp |> List.flatten())
+        |> IO.inspect(label: "result of FNV.hash_list")
+
+      result
+    end)
   end
 
   defp init_mix_with_replication(seed_hash) do
@@ -113,13 +179,16 @@ defmodule Blockchain.Ethash do
     |> List.duplicate(@mix_hash)
     |> List.flatten()
     |> Enum.map(&binary_into_uint32_list/1)
-    |> List.flatten()
+
+    # |> List.flatten()
   end
 
+  # Equation 321
   defp combine_header_and_nonce(block_hash, nonce) do
     Keccak.kec512(block_hash <> nonce_into_64bit(nonce))
   end
 
+  # Equation 322
   defp nonce_into_64bit(nonce) do
     nonce
     |> :binary.encode_unsigned(:little)
