@@ -38,6 +38,11 @@ defmodule ExWire.Sync do
           last_requested_block: integer() | nil
         }
 
+  @spec get_state() :: state
+  def get_state() do
+    GenServer.call(__MODULE__, :get_state)
+  end
+
   @doc """
   Starts a sync process for a given chain.
   """
@@ -101,6 +106,11 @@ defmodule ExWire.Sync do
     :ok = Exth.trace(fn -> "[Sync] Ignoring packet #{packet.__struct__} from #{peer}" end)
 
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_call(:get_state, _from, state) do
+    {:reply, state, state}
   end
 
   @doc """
